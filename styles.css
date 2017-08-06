@@ -1,0 +1,9 @@
+#wrapper{
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-around;
+}
+#textOptions{
+	display: flex;
+	flex-flow: column wrap; 
+}

@@ -1,0 +1,228 @@
+<html>
+<head>
+  <title>
+    FreshPrints Image Editor
+  </title>
+  <link rel="stylesheet" type="text/css" href="styles.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+<!-- Latest compiled JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="fabric-1.7.17.min.js"></script>
+</head>
+<body >
+<div id="wrapper">
+  <canvas id="canvas0" width="800" height="600" style="border: dashed; "></canvas>
+  <br>
+  
+
+  <form id="formWrap">
+  <div>
+    <label for="image_uploads" id="greenLabel">Choose images to upload</label>
+    <input type="file" id="image_uploads" name="image_uploads" accept=".jpg, .jpeg, .png" multiple>
+  </div>
+  
+
+  <div class="preview">
+    <p>No files currently selected for upload</p>
+  </div>
+  <div id="textOptions">
+  <div>
+    <label for="textContent">Insert Text</label>
+    <input type="text" name="inputText" id="inputText">
+
+</div>
+<div>
+<label for="fontSize">FontSize</label>
+<input type="number" name="fontSize" id="fontSize">
+</div>
+<div>
+<label for="fontFamily">FontFamily</label>
+<select name="fontFamily" id="fontFamily">
+  <option value="Times New Roman">Times New Roman</option>
+  <option value="Georgia">Georgia</option>
+  <option value="Verdana">Verdana</option>
+  <option value="Courier New">Courier New</option>
+  <option value="Lucida Console">Lucida Console</option>
+</select>  
+</div>
+<div>
+<label for="fontWeight">FontWeight</label>
+<select name="fontWeight" id="fontWeight">
+  <option value="normal">Normal</option>
+  <option value="bold">Bold</option>
+  <option value="bolder">Bolder</option>
+  <option value="lighter">Lighter</option>
+  <option value="initial">Initial</option>
+  <option value="inherit">Inherit</option>
+</select>  
+</div>
+
+
+  <button type="button" id="addText">Add Text</button>
+  </div>
+
+  <div>
+    <label for="name">Name for the image</label>
+    <input type="text" name="name" id="name">
+    <button type="button" id="imageSaver">Save</button>
+  </div>
+<div>
+    <label for="idForImage">Id for the image</label>
+    <input type="text" name="idForImage" id="idForImage">
+    <button type="button" id="imageLoader">Open</button>
+  </div>
+
+</form>
+<div id="editList">
+  
+</div>
+<button id="editButton">See Edit History</button>
+
+</div>
+  <script type="text/javascript">
+    var canvas=new fabric.Canvas("canvas0");
+    var rect=new fabric.Rect({
+      left:100,
+      top:150,
+      fill:"red",
+      width:200,
+      height:200
+    });
+    canvas.add(rect);
+    var editHistory=[];
+
+var input = document.getElementById('image_uploads');
+var preview = document.querySelector('.preview');
+var imageSaver = document.getElementById("imageSaver");
+var addText = document.getElementById("addText");
+var openImage = document.getElementById("imageLoader");
+var editButton = document.getElementById("editButton");
+
+input.style.opacity = 0;
+
+input.addEventListener('change', updateImageDisplay);
+addText.addEventListener('click',insertText);
+imageSaver.addEventListener('click',saveCanvas);
+openImage.addEventListener('click',loadCanvas);
+editButton.addEventListener('click',showHistory);
+
+
+function showHistory(){
+
+ var History='<p>'+editHistory[0].name+'</p>';
+$("#editList").append(History);
+}
+
+function updateImageDisplay() {
+  while(preview.firstChild) {
+    preview.removeChild(preview.firstChild);
+  }
+
+  var curFiles = input.files;
+  console.log(curFiles);
+  if(curFiles.length === 0) {
+    var para = document.createElement('p');
+    para.textContent = 'No files currently selected for upload';
+    preview.appendChild(para);
+  } else {
+    var list = document.createElement('ol');
+    preview.appendChild(list);
+    for(var i = 0; i < curFiles.length; i++) {
+      var listItem = document.createElement('li');
+      var para = document.createElement('p');
+      if(validFileType(curFiles[i])) {
+        para.textContent = 'File name ' + curFiles[i].name + ', file size ' + returnFileSize(curFiles[i].size) + '.';
+        
+        fabric.Image.fromURL(window.URL.createObjectURL(curFiles[i]), function(img) {
+      var oImg = img.set({ left: 0, top: 0}).scale(0.25);
+      canvas.add(oImg);
+      editHistory.push({name:"image added",object:oImg});
+      });
+
+        listItem.appendChild(para);
+
+      } else {
+        para.textContent = 'File name: ' + curFiles[i].name + ': Not a valid file type. Update your selection.';
+        listItem.appendChild(para);
+      }
+
+      list.appendChild(listItem);
+    }
+  }
+}
+
+function insertText(){
+  var text = new fabric.Text( document.getElementById("inputText").value, {
+   left: 100, top: 100,fontSize: document.getElementById("fontSize").value,fontFamily:document.getElementById("fontFamily").value,fontWeight:document.getElementById("fontWeight").value});
+canvas.add(text);
+editHistory.push({name:"Text added",object:text});
+}
+
+function refreshCanvas(){
+  var json = JSON.stringify(canvas);
+  canvas.clear();
+  canvas.loadFromJSON(json, function() {
+    canvas.renderAll();
+});
+}
+
+var imageSaver = document.getElementById('imageSaver');
+
+function saveCanvas(){
+  var json= JSON.stringify(canvas);
+  var name= document.getElementById("name").value;
+  $.ajax({
+    url:'/saveThisCanvas',
+    type:'POST',
+    data:{name:name,photo:json}
+  }).done((data)=>console.log("data saved: ",data)).fail((reason)=>console.log("not saved",reason));
+
+}
+
+
+function loadCanvas(){
+  var id= document.getElementById("idForImage").value;
+
+  $.ajax({
+    url:'/getImage',
+    type:'get',
+    data:{id:id}
+  }).done((data)=>{
+    console.log("data saved: ",data);
+
+  canvas.loadFromJSON(data[0].photojson, function() {
+    canvas.renderAll();
+});
+}).fail((reason)=>console.log("not saved",reason));
+
+}
+
+var fileTypes = [
+  'image/jpeg',
+  'image/pjpeg',
+  'image/png'
+]
+
+function validFileType(file) {
+  for(var i = 0; i < fileTypes.length; i++) {
+    if(file.type === fileTypes[i]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function returnFileSize(number) {
+  if(number < 1024) {
+    return number + 'bytes';
+  } else if(number > 1024 && number < 1048576) {
+    return (number/1024).toFixed(1) + 'KB';
+  } else if(number > 1048576) {
+    return (number/1048576).toFixed(1) + 'MB';
+  }
+}
+  </script>
+</body>
+</html>
